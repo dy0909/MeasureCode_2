@@ -1,0 +1,39 @@
+// Bluetooth module
+#include <ArduinoBLE.h>
+// Absolute pressure range
+#include <Arduino_LPS22HB.h>
+// Temperature & Humidity
+#include <Arduino_HS300x.h>
+
+void setup()
+{
+    Serial.begin(115200);
+    // Temperature & Humidity sensor
+	if(!HS300x.begin()) Serial.println("HS300x Fail");
+    // Absolute pressure sensor
+    if(!BARO.begin()) Serial.println("LPS22HB Fail");
+}
+
+void loop()
+{
+    // HS3200x
+    float temperature = 0.0;
+    float humidity = 0.0;
+	temperature = HS300x.readTemperature();
+    humidity = HS300x.readHumidity();
+
+    Serial.print("Temperature : ");
+    Serial.println(temperature);
+
+    Serial.print("Humidity : ");
+    Serial.println(humidity);
+
+    // LPS22HB
+    float pressure = 0.0;
+	pressure = BARO.readPressure();
+
+    Serial.print("Pressure : ");
+    Serial.println(pressure);
+
+    delay(500);
+}
