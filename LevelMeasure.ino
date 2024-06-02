@@ -4,49 +4,41 @@
 #include <Arduino_LPS22HB.h>
 // Temperature & Humidity
 #include <Arduino_HS300x.h>
+#include <ArduinoBLE.h>
 
-BLEService MeasureService("19B10000-E8F2-537E-4F6C-D104768A1214");
-//BLEStringCharacteristic MeasureChar("19B10000-E8F2-537E-4F6C-D104768A1214", BLEWrite | BLERead | BLENotify, 10);
-BLECharCharacteristic MeasureChar_1("19B10000-E8F2-537E-4F6C-D104768A1214", BLEWrite | BLERead | BLENotify);
-BLECharCharacteristic MeasureChar_2("19B10000-E8F2-537E-4F6C-D104768A1214", BLEWrite | BLERead |BLENotify);
-BLECharCharacteristic MeasureChar_3("19B10000-E8F2-537E-4F6C-D104768A1214", BLEWrite | BLERead |BLENotify);
+BLEService tempService("1809");
+BLEFloatCharacteristic tempCharacteristic("2A6E", BLERead | BLENotify);
 
 void setup()
 {
     Serial.begin(115200);
     // Temperature & Humidity sensor
-    if(!HS300x.begin()) Serial.println("HS300x Fail");
+	if(!HS300x.begin()) Serial.println("HS300x Fail");
     // Absolute pressure sensor
     if(!BARO.begin()) Serial.println("LPS22HB Fail");
-    // BEL module
-    if(!BLE.begin()) Serial.println("BLE Fail");
 
-    // Set local name
-    BLE.setLocalName("Measure");
-    // Set UUID for service
-    BLE.setAdvertisedService(MeasureService);
+    if (!BLE.begin()) {
+    Serial.println("Failed to initialize BLE!");
+    while (1);
+  }
 
-    // Add characteristic to service
-    MeasureService.addCharacteristic(MeasureChar_1);
-    MeasureService.addCharacteristic(MeasureChar_2);
-    MeasureService.addCharacteristic(MeasureChar_3);
+  // BLE 장치 이름과 서비스 설정
+  BLE.setLocalName("Nano33BLE");
+  BLE.setAdvertisedService(tempService);
 
-    // Add service
-    BLE.addService(MeasureService);
+  // 특성 추가
+  tempService.addCharacteristic(tempCharacteristic);
+  BLE.addService(tempService);
 
-    MeasureChar_1.writeValue(0);
-    MeasureChar_2.writeValue(0);
-    MeasureChar_3.writeValue(0);
-
-    // Start Advertising
-    BLE.advertise();
+  // 광고 시작
+  BLE.advertise();
 }
 
 void loop()
 {
     // HS3200x
-    int temperature = 0;
-    int humidity = 0;
+    float temperature = 0.0;
+    float humidity = 0.0;
 	temperature = HS300x.readTemperature();
     humidity = HS300x.readHumidity();
 
@@ -57,46 +49,30 @@ void loop()
     Serial.println(humidity);
 
     // LPS22HB
-    int pressure = 0;
+    float pressure = 0.0;
 	pressure = BARO.readPressure();
 
     Serial.print("Pressure : ");
     Serial.println(pressure);
 
-    /*
-    String measureText = String(temperature,1);//  sprintf("%f,%f,%f\n", temperature, humidity, pressure);
-    measureText += ',';
-    measureText += String(humidity,1);
-    measureText += ',';
-    measureText += String(pressure,1);
-    */
 
-    // byte byteArray[30] = {0,};
-    // measureText.getBytes(byteArray, sizeof(byteArray));
-    //strcpy((char *)byteArray, measureText);
+    BLEDevice central = BLE.central();
 
-    // BLE loop
-    BLE.poll();
+    if (central) {
+    Serial.print("Connected to central: ");
+    Serial.println(central.address());
 
-    MeasureChar_1.writeValue(temperature);
-    MeasureChar_2.writeValue(humidity);
-    MeasureChar_3.writeValue(pressure);
+    // 중앙 장치가 연결된 동안 온도 측정 및 전송
+    while (central.connected()) {
+      Serial.print("BLE Temperature: ");
+      Serial.println(temperature);
+      
+      // 온도 값 특성에 전송
+      tempCharacteristic.writeValue(temperature);
 
-
-    if(MeasureChar_1.written())
-    {
-        Serial.print("BLE Sended Temp");
-        Serial.println(temperature);
+      // 잠시 대기
+      delay(1000);
     }
-    if(MeasureChar_2.written())
-    {
-        Serial.print("BLE Sended Humid");
-        Serial.println(humidity);
-    }
-    if(MeasureChar_3.written())
-    {
-        Serial.print("BLE Sended Press");
-        Serial.println(pressure);
     }
 
     delay(500);
