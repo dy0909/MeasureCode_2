@@ -77,3 +77,92 @@ void loop()
 
     delay(500);
 }
+
+
+
+
+
+
+#include <ArduinoBLE.h>
+#include <Arduino_LPS22HB.h> // Pressure sensor
+#include <Arduino_HTS221.h>  // Humidity and Temperature sensor
+
+BLEService sensorService("180C"); // Custom service
+
+// BLE Characteristics
+BLEStringCharacteristic sensorDataCharacteristic("2A56", BLERead | BLENotify, 32);
+
+void setup() {
+  Serial.begin(9600);
+  while (!Serial);
+
+  // Initialize the sensors
+  if (!BARO.begin()) {
+    Serial.println("Failed to initialize pressure sensor!");
+    while (1);
+  }
+
+  if (!HTS.begin()) {
+    Serial.println("Failed to initialize temperature and humidity sensor!");
+    while (1);
+  }
+
+  // Initialize BLE
+  if (!BLE.begin()) {
+    Serial.println("starting BLE failed!");
+    while (1);
+  }
+
+  // Set BLE device name
+  BLE.setLocalName("Nano33BLE_Sense");
+  BLE.setAdvertisedService(sensorService);
+
+  // Add the characteristic to the service
+  sensorService.addCharacteristic(sensorDataCharacteristic);
+
+  // Add the service
+  BLE.addService(sensorService);
+
+  // Start advertising
+  BLE.advertise();
+
+  Serial.println("BLE device active, waiting for connections...");
+}
+
+void loop() {
+  // Listen for BLE connections
+  BLEDevice central = BLE.central();
+
+  if (central) {
+    Serial.print("Connected to central: ");
+    Serial.println(central.address());
+
+    while (central.connected()) {
+      // Read sensor values
+      float temperature = HTS.readTemperature();
+      float humidity = HTS.readHumidity();
+      float pressure = BARO.readPressure();
+
+      // Create a string with the sensor values separated by commas
+      char sensorData[32];
+      snprintf(sensorData, sizeof(sensorData), "%.2f,%.2f,%.2f", temperature, humidity, pressure);
+
+      // Update BLE characteristic
+      sensorDataCharacteristic.writeValue(sensorData);
+
+      Serial.print("Temperature: ");
+      Serial.print(temperature);
+      Serial.print(" °C, Humidity: ");
+      Serial.print(humidity);
+      Serial.print(" %, Pressure: ");
+      Serial.print(pressure);
+      Serial.println(" hPa");
+
+      delay(1000); // Update every second
+    }
+
+    Serial.print("Disconnected from central: ");
+    Serial.println(central.address());
+  }
+}
+
